@@ -42,13 +42,13 @@
       text-align: center;
       margin-top: 1rem;
     }
-    .controls button {
+    .controls button, .controls input[type="file"] {
       background: transparent;
       color: #0ff;
       border: 1px solid #0ff;
       padding: 0.5rem 1rem;
       font-size: 1rem;
-      margin: 0 0.5rem;
+      margin: 0.25rem;
       cursor: pointer;
       text-shadow: 0 0 5px #0ff;
     }
@@ -61,6 +61,7 @@
 <body>
   <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録</div>
   <div class="controls">
+    <input type="file" id="audioFile" accept="audio/*">
     <button id="playBtn">▶ 再生</button>
     <button id="saveBtn">💾 保存</button>
     <button id="aiFixBtn">🤖 AI補正</button>
@@ -70,30 +71,22 @@
   <script>
     const laneCount = 4;
     const laneWrapper = document.getElementById('laneWrapper');
-    const audioURL = sessionStorage.getItem('audioURL');
-    const chart = JSON.parse(sessionStorage.getItem('chartData') || '[]');
+    const keyMap = ['d', 'f', 'j', 'k'];
+    const lanes = [];
     const audio = new Audio();
     let startTime = 0;
     let isPlaying = false;
     let recordedNotes = [];
-    const keyMap = ['d', 'f', 'j', 'k'];
-    const lanes = [];
+    let chart = [];
 
-    if (!audioURL) {
-      alert("音声ファイルが読み込まれていません。editor-loader.htmlからやり直してください。");
-      throw new Error("audioURL not found in sessionStorage");
-    }
-
-    // Audio設定＋形式確認
-    audio.src = audioURL;
-    audio.addEventListener('error', () => {
-      console.error("Audio Error:", audio.error);
-      alert("⚠️ 音声の読み込みに失敗しました。MP3またはWAV形式を使用してください。\n詳細: " + audio.error?.message);
+    document.getElementById('audioFile').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) {
+        const blobURL = URL.createObjectURL(file);
+        audio.src = blobURL;
+        console.log("🎧 音声ファイル読み込み成功", blobURL);
+      }
     });
-
-    if (!audio.canPlayType("audio/mpeg") && !audio.canPlayType("audio/wav")) {
-      console.warn("ブラウザがMP3/WAV再生に非対応かも？");
-    }
 
     function createLanes() {
       for (let i = 0; i < laneCount; i++) {
@@ -113,7 +106,7 @@
     }
 
     function playChart() {
-      console.log("[再生] 開始", audioURL);
+      console.log("[再生] 開始");
       startTime = performance.now();
       isPlaying = true;
       chart.forEach(n => spawnNote(n.lane, n.time));
