@@ -1,3 +1,4 @@
+<!-- editor.html -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -6,6 +7,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
   <style>
+    .editor-header {
+      padding: 1rem;
+      background: #001820;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
+    }
     .lane-wrapper {
       display: flex;
       justify-content: center;
@@ -15,17 +22,15 @@
       gap: 1rem;
       perspective: 800px;
     }
-
     .lane {
       width: 60px;
       height: 100%;
-      background: linear-gradient(to bottom, #000 0%, #002020 100%);
+      background: linear-gradient(to bottom, #000000 0%, #002020 100%);
       border: 1px solid #044;
       box-shadow: inset 0 0 10px #0ff5;
       position: relative;
       transform: rotateX(15deg);
     }
-
     .note {
       width: 100%;
       height: 12px;
@@ -34,18 +39,33 @@
       position: absolute;
       top: -12px;
     }
+    .controls {
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .controls button {
+      background: transparent;
+      color: #0ff;
+      border: 1px solid #0ff;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin: 0 0.5rem;
+      cursor: pointer;
+      text-shadow: 0 0 5px #0ff;
+    }
+    .controls button:hover {
+      background: #0ff;
+      color: black;
+    }
   </style>
 </head>
 <body>
-  <div class="header">CYBER BLITZ EDITOR - 音楽を再生してノーツを記録</div>
-
+  <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録</div>
   <div class="controls">
     <button id="playBtn">▶ 再生</button>
     <button id="saveBtn">💾 保存</button>
     <button id="aiFixBtn">🤖 AI補正</button>
-    <button onclick="location.href='keyconfig.html'">🎛 キー設定</button>
   </div>
-
   <div class="lane-wrapper" id="laneWrapper"></div>
 
   <script>
@@ -53,12 +73,23 @@
     const laneWrapper = document.getElementById('laneWrapper');
     const audioURL = sessionStorage.getItem('audioURL');
     const chart = JSON.parse(sessionStorage.getItem('chartData') || '[]');
-    const audio = new Audio(audioURL);
+    const audio = new Audio();
     let startTime = 0;
     let isPlaying = false;
     let recordedNotes = [];
-    const keyMap = JSON.parse(localStorage.getItem('keyConfig') || '["d", "f", "j", "k"]');
+    const keyMap = ['d', 'f', 'j', 'k'];
     const lanes = [];
+
+    if (!audioURL) {
+      alert("音声ファイルが読み込まれていません。editor-loader.htmlからやり直してください。");
+      throw new Error("audioURL not found in sessionStorage");
+    }
+
+    audio.src = audioURL;
+    audio.addEventListener('error', () => {
+      alert("オーディオの読み込みに失敗しました。形式が正しいか確認してください。");
+      console.error("Audio Error", audio.error);
+    });
 
     function createLanes() {
       for (let i = 0; i < laneCount; i++) {
@@ -86,8 +117,7 @@
     }
 
     function saveChart() {
-      const merged = [...chart, ...recordedNotes];
-      const blob = new Blob([JSON.stringify(merged, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(recordedNotes, null, 2)], {type: 'application/json'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'chart.json';
@@ -97,11 +127,11 @@
     function setupInput() {
       document.addEventListener('keydown', (e) => {
         if (!isPlaying) return;
-        const laneIndex = keyMap.indexOf(e.key.toLowerCase());
+        const laneIndex = keyMap.indexOf(e.key);
         if (laneIndex !== -1) {
           const time = (performance.now() - startTime) / 1000;
           recordedNotes.push({ lane: laneIndex, time });
-          console.log(`[記録] lane=${laneIndex}, time=${time.toFixed(3)}`);
+          console.log(`ノート記録: lane=${laneIndex}, time=${time.toFixed(3)}`);
           spawnNote(laneIndex, time);
         }
       });
@@ -126,8 +156,8 @@
     document.getElementById('playBtn').onclick = playChart;
     document.getElementById('saveBtn').onclick = saveChart;
     document.getElementById('aiFixBtn').onclick = () => {
-      alert('AI補正（試作）→ 音声波形とノーツを自動整列（今後実装）');
-      console.log('[AI補正] 機能は後日実装予定。');
+      console.log('[AI補正] 実行 → WAV波形に基づいて時間を微修正（仮）');
+      alert('AI補正（開発中）: 波形と照合してノーツタイミングを調整します');
     };
 
     createLanes();
