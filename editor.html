@@ -43,7 +43,22 @@
       text-align: center;
       margin-top: 1rem;
     }
-    .controls button, .controls input[type="file"] {
+    .controls label.btn {
+      display: inline-block;
+      cursor: pointer;
+      border: 1px solid #0ff;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin: 0.25rem;
+      text-shadow: 0 0 5px #0ff;
+      color: #0ff;
+      background: transparent;
+    }
+    .controls label.btn:hover {
+      background: #0ff;
+      color: black;
+    }
+    .controls button {
       background: transparent;
       color: #0ff;
       border: 1px solid #0ff;
@@ -67,8 +82,8 @@
 <body>
   <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録・編集</div>
   <div class="controls">
-    <input type="file" id="audioFile" accept="audio/*">
-    <input type="file" id="chartFile" accept=".json">
+    <label class="btn">🎧 音声選択<input type="file" id="audioFile" accept="audio/*" style="display:none;"></label>
+    <label class="btn">📄 チャート選択<input type="file" id="chartFile" accept=".json" style="display:none;"></label>
     <button id="playBtn">▶ 再生</button>
     <button id="saveBtn">💾 保存</button>
     <button id="undoBtn">↩️ Undo</button>
