@@ -1,136 +1,157 @@
+<!-- editor.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Editor - CYBER BLITZ</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <title>エディター - CYBER BLITZ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #000;
-      font-family: 'Orbitron', monospace;
-      color: #0ff;
-      overflow: hidden;
-    }
-
-    .header {
-      text-align: center;
-      font-size: 1.2rem;
+    .editor-header {
       padding: 1rem;
-      background: #0ff2;
+      background: #001820;
+      color: #0ff;
       text-shadow: 0 0 5px #0ff;
     }
-
-    .controls {
-      text-align: center;
-      margin: 1rem;
-    }
-
-    .lane-container {
+    .lane-wrapper {
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       height: 70vh;
+      margin-top: 1rem;
       gap: 1rem;
-      position: relative;
-      overflow: hidden;
+      perspective: 800px;
     }
-
     .lane {
       width: 60px;
       height: 100%;
-      background: linear-gradient(to bottom, #111, #0ff1);
-      border: 1px solid #0ff3;
-      box-shadow: 0 0 10px #0ff4;
+      background: linear-gradient(to bottom, #000000 0%, #002020 100%);
+      border: 1px solid #044;
+      box-shadow: inset 0 0 10px #0ff5;
       position: relative;
+      transform: rotateX(15deg);
     }
-
     .note {
       width: 100%;
-      height: 10px;
-      background-color: #f0f;
-      box-shadow: 0 0 10px #f0f;
+      height: 12px;
+      background: #f0f;
+      box-shadow: 0 0 8px #f0f, 0 0 16px #f0f;
       position: absolute;
+      top: -12px;
     }
-
-    button {
+    .controls {
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .controls button {
       background: transparent;
       color: #0ff;
       border: 1px solid #0ff;
       padding: 0.5rem 1rem;
-      font-family: inherit;
       font-size: 1rem;
+      margin: 0 0.5rem;
       cursor: pointer;
+      text-shadow: 0 0 5px #0ff;
     }
-
-    button:hover {
+    .controls button:hover {
       background: #0ff;
-      color: #000;
+      color: black;
     }
   </style>
 </head>
 <body>
-
-  <div class="header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認</div>
-
+  <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録</div>
   <div class="controls">
-    <button id="playBtn">▶ PLAY</button>
+    <button id="playBtn">▶ 再生</button>
+    <button id="saveBtn">💾 保存</button>
+    <button id="aiFixBtn">🤖 AI補正</button>
   </div>
-
-  <div class="lane-container" id="laneContainer">
-    <div class="lane" id="lane0"></div>
-    <div class="lane" id="lane1"></div>
-    <div class="lane" id="lane2"></div>
-    <div class="lane" id="lane3"></div>
-  </div>
+  <div class="lane-wrapper" id="laneWrapper"></div>
 
   <script>
     const laneCount = 4;
-    const lanes = [...Array(laneCount)].map((_, i) => document.getElementById(`lane${i}`));
-    const noteSpeed = 100; // px/sec
-
-    const chartJSON = sessionStorage.getItem('chartData');
-    const chart = JSON.parse(chartJSON || '[]');
+    const laneWrapper = document.getElementById('laneWrapper');
     const audioURL = sessionStorage.getItem('audioURL');
+    const chart = JSON.parse(sessionStorage.getItem('chartData') || '[]');
     const audio = new Audio(audioURL);
-
     let startTime = 0;
     let isPlaying = false;
-    const allNotes = [];
+    let recordedNotes = [];
+    const keyMap = ['d', 'f', 'j', 'k'];
+    const lanes = [];
+
+    function createLanes() {
+      for (let i = 0; i < laneCount; i++) {
+        const lane = document.createElement('div');
+        lane.className = 'lane';
+        laneWrapper.appendChild(lane);
+        lanes.push(lane);
+      }
+    }
 
     function spawnNote(laneIndex, time) {
       const note = document.createElement('div');
       note.className = 'note';
       note.dataset.spawnTime = time;
-      note.style.top = '-10px';
       lanes[laneIndex].appendChild(note);
-      allNotes.push({ el: note, lane: laneIndex, time });
+      return { el: note, lane: laneIndex, time };
     }
 
-    document.getElementById('playBtn').onclick = () => {
-      audio.currentTime = 0;
-      audio.play();
+    function playChart() {
       startTime = performance.now();
       isPlaying = true;
-
       chart.forEach(n => spawnNote(n.lane, n.time));
-    };
-
-    function animate() {
-      if (isPlaying) {
-        const now = (performance.now() - startTime) / 1000;
-        allNotes.forEach(({ el, time }) => {
-          const elapsed = now - time;
-          const y = elapsed * noteSpeed;
-          if (y >= -10) el.style.top = `${y}px`;
-        });
-      }
-      requestAnimationFrame(animate);
+      audio.currentTime = 0;
+      audio.play();
     }
 
-    animate();
+    function saveChart() {
+      const blob = new Blob([JSON.stringify(recordedNotes, null, 2)], {type: 'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'chart.json';
+      a.click();
+    }
+
+    function setupInput() {
+      document.addEventListener('keydown', (e) => {
+        if (!isPlaying) return;
+        const laneIndex = keyMap.indexOf(e.key);
+        if (laneIndex !== -1) {
+          const time = (performance.now() - startTime) / 1000;
+          recordedNotes.push({ lane: laneIndex, time });
+          console.log(`ノート記録: lane=${laneIndex}, time=${time.toFixed(3)}`);
+          spawnNote(laneIndex, time);
+        }
+      });
+    }
+
+    function animateNotes() {
+      const noteSpeed = 120; // px/sec
+      function loop() {
+        if (isPlaying) {
+          const now = (performance.now() - startTime) / 1000;
+          document.querySelectorAll('.note').forEach(note => {
+            const t = parseFloat(note.dataset.spawnTime);
+            const y = (now - t) * noteSpeed;
+            note.style.top = `${y}px`;
+          });
+        }
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    document.getElementById('playBtn').onclick = playChart;
+    document.getElementById('saveBtn').onclick = saveChart;
+    document.getElementById('aiFixBtn').onclick = () => {
+      console.log('[AI補正] 実行 → WAV波形に基づいて時間を微修正（仮）');
+      alert('AI補正（開発中）: 波形と照合してノーツタイミングを調整します');
+    };
+
+    createLanes();
+    setupInput();
+    animateNotes();
   </script>
 </body>
 </html>
