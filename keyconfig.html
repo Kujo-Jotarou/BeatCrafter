@@ -1,1 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>キー設定 - CYBER BLITZ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .container {
+      max-width: 500px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background: #001820;
+      color: #0ff;
+      text-align: center;
+      box-shadow: 0 0 15px #0ff5;
+    }
+    label {
+      display: block;
+      margin: 1rem 0 0.5rem;
+      font-weight: bold;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      background: #000;
+      color: #0ff;
+      border: 1px solid #0ff;
+      text-align: center;
+      font-family: monospace;
+      font-size: 1.2rem;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 0.6rem 1.5rem;
+      background: transparent;
+      color: #0ff;
+      border: 1px solid #0ff;
+      cursor: pointer;
+      text-shadow: 0 0 5px #0ff;
+    }
+    button:hover {
+      background: #0ff;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>キー設定</h2>
+    <p>使用したいキーを1つずつ入力してください</p>
+
+    <label for="lane0">レーン1：</label>
+    <input id="lane0" maxlength="1" placeholder="例: D" />
+
+    <label for="lane1">レーン2：</label>
+    <input id="lane1" maxlength="1" placeholder="例: F" />
+
+    <label for="lane2">レーン3：</label>
+    <input id="lane2" maxlength="1" placeholder="例: J" />
+
+    <label for="lane3">レーン4：</label>
+    <input id="lane3" maxlength="1" placeholder="例: K" />
+
+    <button onclick="saveConfig()">💾 保存して戻る</button>
+  </div>
+
+  <script>
+    const inputs = [...Array(4)].map((_, i) => document.getElementById(`lane${i}`));
+
+    window.onload = () => {
+      const saved = JSON.parse(localStorage.getItem('keyConfig') || '["d","f","j","k"]');
+      saved.forEach((key, i) => {
+        inputs[i].value = key;
+      });
+    };
+
+    function saveConfig() {
+      const keys = inputs.map(input => input.value.toLowerCase());
+      if (new Set(keys).size !== keys.length) {
+        alert('各キーは重複しないように設定してください');
+        return;
+      }
+      localStorage.setItem('keyConfig', JSON.stringify(keys));
+      alert('キー設定を保存しました！');
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
 
