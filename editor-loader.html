@@ -4,124 +4,137 @@
   <meta charset="UTF-8" />
   <title>エディタローダー - CYBER BLITZ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <link rel="stylesheet" href="style.css" />
   <style>
     body {
+      background: #000;
+      color: #0ff;
+      font-family: 'Orbitron', monospace;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100vh;
-      background: black;
-      color: cyan;
-      font-family: 'Orbitron', sans-serif;
       text-align: center;
     }
-
     .dropzone {
-      border: 2px dashed cyan;
+      border: 2px dashed #0ff;
       padding: 2rem;
       width: 80%;
       max-width: 500px;
-      margin: 1rem;
       cursor: pointer;
-      text-shadow: 0 0 5px cyan;
+      text-shadow: 0 0 5px #0ff;
     }
-
-    .dropzone:hover {
-      background-color: rgba(0, 255, 255, 0.05);
+    .dropzone.dragover {
+      background-color: rgba(0, 255, 255, 0.1);
+      box-shadow: 0 0 15px #0ff;
     }
-
-    .status {
-      color: magenta;
-      margin-top: 1rem;
-    }
-
-    .note {
-      color: #aaa;
-      font-size: 0.8rem;
-      margin-top: 0.5rem;
-    }
-
     input[type="file"] {
       display: none;
+    }
+    .status {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #f0f;
+    }
+    .note {
+      color: #ff0;
+      font-size: 0.8rem;
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
+
   <div class="dropzone" id="dropzone">
-    <p><span style="color:magenta">音楽ファイルと chart.json をドラッグ＆ドロップ</span></p>
+    <p><span style="color:#f0f">音楽ファイルと <strong>chart.json</strong> をドラッグ＆ドロップ</span></p>
     <p>またはクリックして選択</p>
   </div>
 
   <input type="file" id="fileInput" multiple accept=".mp3,.wav,.json"/>
 
-  <div class="status" id="status">オーディオ: ❌ | チャート: なし</div>
-  <div class="note">※ オーディオのみでも新規作成で起動します</div>
+  <div class="status" id="statusLabel">オーディオ: ❌ | チャート: ❌</div>
+  <div class="note">※ オーディオのみでも新規譜面で起動します</div>
 
   <script>
-    const dropzone = document.getElementById("dropzone");
-    const fileInput = document.getElementById("fileInput");
-    const status = document.getElementById("status");
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const statusLabel = document.getElementById('statusLabel');
 
     let audioFile = null;
     let chartFile = null;
 
     function updateStatus() {
-      status.textContent =
+      statusLabel.textContent =
         `オーディオ: ${audioFile?.name || '❌'} | チャート: ${chartFile?.name || 'なし（新規）'}`;
     }
 
-    function proceedToEditor(base64Audio) {
-      sessionStorage.setItem("audioURL", base64Audio);
-
-      if (chartFile) {
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-          sessionStorage.setItem("chartData", reader.result);
-          location.href = "editor.html";
-        };
-        reader.readAsText(chartFile);
-      } else {
-        sessionStorage.setItem("chartData", "[]");
-        location.href = "editor.html";
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function proceedToEditor() {
+      try {
+        const base64Audio = await toBase64(audioFile);
+        sessionStorage.setItem('audioURL', base64Audio);
+
+        if (chartFile) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            sessionStorage.setItem('chartData', reader.result);
+            window.location.href = 'editor.html';
+          };
+          reader.readAsText(chartFile);
+        } else {
+          sessionStorage.setItem('chartData', '[]');
+          window.location.href = 'editor.html';
+        }
+      } catch (err) {
+        alert("ファイルの読み込みに失敗しました");
+        console.error(err);
       }
     }
 
     function handleFiles(files) {
-      for (let f of files) {
-        if (f.type.startsWith("audio/")) audioFile = f;
-        else if (f.name.endsWith(".json")) chartFile = f;
+      for (const file of files) {
+        if (file.type.startsWith("audio/")) {
+          audioFile = file;
+        } else if (file.name.endsWith(".json")) {
+          chartFile = file;
+        }
       }
-
       updateStatus();
-
       if (audioFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          proceedToEditor(reader.result);
-        };
-        reader.readAsDataURL(audioFile); // Base64形式で格納
+        proceedToEditor();
       }
     }
 
-    dropzone.addEventListener("dragover", e => {
+    dropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
-      dropzone.style.backgroundColor = "rgba(0,255,255,0.05)";
+      dropzone.classList.add('dragover');
     });
 
-    dropzone.addEventListener("dragleave", () => {
-      dropzone.style.backgroundColor = "transparent";
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
     });
 
-    dropzone.addEventListener("drop", e => {
+    dropzone.addEventListener('drop', (e) => {
       e.preventDefault();
-      dropzone.style.backgroundColor = "transparent";
+      dropzone.classList.remove('dragover');
       handleFiles(e.dataTransfer.files);
     });
 
-    dropzone.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", () => handleFiles(fileInput.files));
+    dropzone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', () => {
+      handleFiles(fileInput.files);
+    });
   </script>
 </body>
 </html>
