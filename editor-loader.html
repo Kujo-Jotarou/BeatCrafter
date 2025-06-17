@@ -1,59 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Editor Loader - CYBER BLITZ</title>
+  <title>エディタローダー - CYBER BLITZ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+
     body {
       margin: 0;
       background: #000;
-      font-family: 'Orbitron', monospace;
       color: #0ff;
+      font-family: 'Orbitron', monospace;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
-      flex-direction: column;
+      text-align: center;
     }
 
     .dropzone {
       border: 2px dashed #0ff;
-      padding: 3rem;
+      padding: 2rem;
       width: 80%;
       max-width: 500px;
-      text-align: center;
       cursor: pointer;
+      transition: 0.2s;
       text-shadow: 0 0 5px #0ff;
-      transition: all 0.2s ease;
+    }
+
+    .dropzone:hover {
+      background-color: rgba(0, 255, 255, 0.05);
     }
 
     .dropzone.dragover {
       background-color: rgba(0, 255, 255, 0.1);
-      box-shadow: 0 0 10px #0ff;
-    }
-
-    .file-label {
-      margin-top: 1rem;
-      color: #888;
-      font-size: 0.9rem;
+      box-shadow: 0 0 15px #0ff;
     }
 
     input[type="file"] {
       display: none;
+    }
+
+    .status {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #f0f;
+    }
+
+    .note {
+      color: #888;
+      font-size: 0.8rem;
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
 
   <div class="dropzone" id="dropzone">
-    <p><strong>Drag & Drop</strong> your <span style="color:#f0f">music</span> and <span style="color:#f0f">chart.json</span> file here</p>
-    <p>or click to select files manually</p>
+    <p><span style="color:#f0f">ここに音楽と chart.json ファイルをドラッグアンドドロップします</span></p>
+    <p>または、クリックしてファイルを手動で選択します</p>
   </div>
 
   <input type="file" id="fileInput" multiple accept=".mp3,.wav,.json"/>
 
-  <div class="file-label" id="statusLabel">Waiting for files...</div>
+  <div class="status" id="statusLabel">オーディオ: ❌ | チャート: ❌</div>
+  <div class="note">※ オーディオだけでも新規譜面作成としてエディタが起動します</div>
 
   <script>
     const dropzone = document.getElementById('dropzone');
@@ -63,6 +76,34 @@
     let audioFile = null;
     let chartFile = null;
 
+    function updateStatus() {
+      statusLabel.textContent =
+        `オーディオ: ${audioFile?.name || '❌'} | チャート: ${chartFile?.name || 'なし（新規）'}`;
+    }
+
+    function proceedToEditor() {
+      const readerAudio = new FileReader();
+      readerAudio.onload = () => {
+        const audioData = readerAudio.result;
+
+        if (chartFile) {
+          const readerChart = new FileReader();
+          readerChart.onload = () => {
+            const chartData = readerChart.result;
+            sessionStorage.setItem('audioData', audioData);
+            sessionStorage.setItem('chartData', chartData);
+            window.location.href = 'editor.html';
+          };
+          readerChart.readAsText(chartFile);
+        } else {
+          sessionStorage.setItem('audioData', audioData);
+          sessionStorage.setItem('chartData', '[]'); // 空の譜面データで開始
+          window.location.href = 'editor.html';
+        }
+      };
+      readerAudio.readAsDataURL(audioFile);
+    }
+
     function handleFiles(files) {
       for (let file of files) {
         if (file.type.startsWith("audio/")) {
@@ -71,35 +112,10 @@
           chartFile = file;
         }
       }
-
       updateStatus();
-
-      if (audioFile && chartFile) {
+      if (audioFile) {
         proceedToEditor();
       }
-    }
-
-    function updateStatus() {
-      statusLabel.textContent = `Audio: ${audioFile?.name || '❌'} | Chart: ${chartFile?.name || '❌'}`;
-    }
-
-    function proceedToEditor() {
-      const readerAudio = new FileReader();
-      const readerChart = new FileReader();
-
-      readerAudio.onload = () => {
-        const audioData = readerAudio.result;
-        readerChart.onload = () => {
-          const chartData = readerChart.result;
-
-          sessionStorage.setItem('audioData', audioData);
-          sessionStorage.setItem('chartData', chartData);
-          window.location.href = 'editor.html';
-        };
-        readerChart.readAsText(chartFile);
-      };
-
-      readerAudio.readAsDataURL(audioFile);
     }
 
     dropzone.addEventListener('dragover', (e) => {
