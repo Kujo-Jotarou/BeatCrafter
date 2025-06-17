@@ -61,28 +61,31 @@
     }
 
     function proceedToEditor() {
-      const audioReader = new FileReader();
-      audioReader.onload = () => {
-        try {
-          const base64 = audioReader.result;
-          sessionStorage.setItem('audioURL', base64);
-          if (chartFile) {
-            const chartReader = new FileReader();
-            chartReader.onload = () => {
-              sessionStorage.setItem('chartData', chartReader.result);
-              location.href = 'editor.html';
-            };
-            chartReader.readAsText(chartFile);
-          } else {
-            sessionStorage.setItem('chartData', '[]');
+      try {
+        const blobURL = URL.createObjectURL(audioFile);
+        sessionStorage.setItem('audioURL', blobURL);
+      } catch (e) {
+        alert("音声ファイルの読み込みに失敗しました");
+        console.error("Blob URL 生成失敗", e);
+        return;
+      }
+
+      if (chartFile) {
+        const chartReader = new FileReader();
+        chartReader.onload = () => {
+          try {
+            sessionStorage.setItem('chartData', chartReader.result);
             location.href = 'editor.html';
+          } catch (e) {
+            alert("chart.json が大きすぎます");
+            console.error("chartData 格納失敗", e);
           }
-        } catch (e) {
-          alert("ファイルが大きすぎます。5MB以内の音声ファイルを使用してください。");
-          console.error("Base64格納失敗", e);
-        }
-      };
-      audioReader.readAsDataURL(audioFile);
+        };
+        chartReader.readAsText(chartFile);
+      } else {
+        sessionStorage.setItem('chartData', '[]');
+        location.href = 'editor.html';
+      }
     }
 
     function handleFiles(files) {
