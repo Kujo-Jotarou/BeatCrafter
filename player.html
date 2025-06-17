@@ -1,1 +1,108 @@
+<!-- player.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>CYBER BLITZ - プレイ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Orbitron', monospace;
+      color: #0ff;
+      overflow: hidden;
+    }
+    .play-header {
+      text-align: center;
+      padding: 1rem;
+      background: #001820;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
+    }
+    .lane-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      height: 80vh;
+      margin-top: 1rem;
+      gap: 1rem;
+      perspective: 800px;
+    }
+    .lane {
+      width: 60px;
+      height: 100%;
+      background: linear-gradient(to bottom, #001010 0%, #002020 100%);
+      border: 1px solid #044;
+      box-shadow: inset 0 0 8px #0ff5;
+      position: relative;
+      transform: rotateX(15deg);
+    }
+    .note {
+      width: 100%;
+      height: 12px;
+      background: #f0f;
+      box-shadow: 0 0 8px #f0f, 0 0 16px #f0f;
+      position: absolute;
+      top: -12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="play-header">CYBER BLITZ - BEATMAPプレイ中</div>
+  <div class="lane-wrapper" id="laneWrapper"></div>
+
+  <script>
+    const laneCount = 4;
+    const laneWrapper = document.getElementById('laneWrapper');
+    const audioURL = sessionStorage.getItem('audioURL');
+    const chart = JSON.parse(sessionStorage.getItem('chartData') || '[]');
+    const audio = new Audio(audioURL);
+    const lanes = [];
+    const noteSpeed = 120;
+    let startTime = 0;
+
+    function createLanes() {
+      for (let i = 0; i < laneCount; i++) {
+        const lane = document.createElement('div');
+        lane.className = 'lane';
+        laneWrapper.appendChild(lane);
+        lanes.push(lane);
+      }
+    }
+
+    function spawnNote(laneIndex, time) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.dataset.spawnTime = time;
+      lanes[laneIndex].appendChild(note);
+    }
+
+    function animateNotes() {
+      function loop() {
+        const now = (performance.now() - startTime) / 1000;
+        document.querySelectorAll('.note').forEach(note => {
+          const t = parseFloat(note.dataset.spawnTime);
+          const y = (now - t) * noteSpeed;
+          note.style.top = `${y}px`;
+        });
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function playChart() {
+      chart.forEach(n => spawnNote(n.lane, n.time));
+      audio.currentTime = 0;
+      audio.play();
+      startTime = performance.now();
+      animateNotes();
+    }
+
+    createLanes();
+    playChart();
+  </script>
+</body>
+</html>
 
