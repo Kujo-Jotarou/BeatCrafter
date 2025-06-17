@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
-
     body {
       margin: 0;
       background: #000;
@@ -82,26 +81,21 @@
     }
 
     function proceedToEditor() {
-      const readerAudio = new FileReader();
-      readerAudio.onload = () => {
-        const audioData = readerAudio.result;
+      const blobURL = URL.createObjectURL(audioFile);
+      sessionStorage.setItem('audioURL', blobURL);
 
-        if (chartFile) {
-          const readerChart = new FileReader();
-          readerChart.onload = () => {
-            const chartData = readerChart.result;
-            sessionStorage.setItem('audioData', audioData);
-            sessionStorage.setItem('chartData', chartData);
-            window.location.href = 'editor.html';
-          };
-          readerChart.readAsText(chartFile);
-        } else {
-          sessionStorage.setItem('audioData', audioData);
-          sessionStorage.setItem('chartData', '[]'); // 空の譜面データで開始
+      if (chartFile) {
+        const readerChart = new FileReader();
+        readerChart.onload = () => {
+          const chartData = readerChart.result;
+          sessionStorage.setItem('chartData', chartData);
           window.location.href = 'editor.html';
-        }
-      };
-      readerAudio.readAsDataURL(audioFile);
+        };
+        readerChart.readAsText(chartFile);
+      } else {
+        sessionStorage.setItem('chartData', '[]');
+        window.location.href = 'editor.html';
+      }
     }
 
     function handleFiles(files) {
