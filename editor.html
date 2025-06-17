@@ -15,11 +15,11 @@
     .lane-wrapper {
       display: flex;
       justify-content: center;
-      align-items: flex-start;
+      align-items: flex-end;
       height: 70vh;
       margin-top: 1rem;
       gap: 1rem;
-      perspective: 800px;
+      position: relative;
     }
     .lane {
       width: 60px;
@@ -28,7 +28,7 @@
       border: 1px solid #044;
       box-shadow: inset 0 0 10px #0ff5;
       position: relative;
-      transform: rotateX(15deg);
+      overflow: hidden;
     }
     .note {
       width: 100%;
@@ -36,15 +36,28 @@
       background: #f0f;
       box-shadow: 0 0 8px #f0f, 0 0 16px #f0f;
       position: absolute;
-      top: -12px;
+      bottom: 0;
       cursor: grab;
     }
-    .note:active {
-      cursor: grabbing;
-    }
-    .hold {
-      background: linear-gradient(to bottom, #ff0, #f0f);
+    .note.hold {
       height: 60px;
+      background: linear-gradient(to bottom, #ff0, #f0f);
+    }
+    .bar-line {
+      position: absolute;
+      width: 100%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+    }
+    .lane-key-label {
+      position: absolute;
+      bottom: -24px;
+      width: 100%;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
     }
     .controls {
       text-align: center;
@@ -63,11 +76,6 @@
     .controls button:hover {
       background: #0ff;
       color: black;
-    }
-    .keymap {
-      margin-top: 1rem;
-      color: #ccc;
-      font-size: 0.9rem;
     }
     canvas#waveform {
       width: 100%;
@@ -88,214 +96,81 @@
     <button id="undoBtn">↩️ Undo</button>
     <button id="aiFixBtn">🤖 AI補正</button>
     <button id="keyConfigBtn">🎛 キー設定</button>
+    <button id="testPlayBtn">🕹 テスト</button>
   </div>
   <canvas id="waveform"></canvas>
   <div class="lane-wrapper" id="laneWrapper"></div>
-  <div class="keymap" id="keyMapDisplay"></div>
-
   <script>
-    const laneCount = 4;
-    const laneWrapper = document.getElementById('laneWrapper');
-    const keyMapDisplay = document.getElementById('keyMapDisplay');
-    const waveformCanvas = document.getElementById('waveform');
-    const waveformCtx = waveformCanvas.getContext('2d');
-    let keyMap = JSON.parse(localStorage.getItem('keyMap')) || ['d', 'f', 'j', 'k'];
+    const keyMap = ['d', 'f', 'j', 'k'];
     const lanes = [];
-    let audio = new Audio();
-    let audioBuffer;
-    let startTime = 0;
-    let isPlaying = false;
+    const audio = new Audio();
     let recordedNotes = [];
-    let chart = [];
-    let historyStack = [];
 
-    function updateKeyMapDisplay() {
-      keyMapDisplay.textContent = `キー設定: ${keyMap.join(' / ')}`;
-    }
-
-    document.getElementById('audioFile').addEventListener('change', async (e) => {
+    document.getElementById('audioFile').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        const blobURL = URL.createObjectURL(file);
-        audio.src = blobURL;
-        const arrayBuffer = await file.arrayBuffer();
-        const context = new AudioContext();
-        context.decodeAudioData(arrayBuffer, (buffer) => {
-          audioBuffer = buffer;
-          drawWaveform(buffer);
-        });
-        console.log("🎧 音声ファイル読み込み成功", blobURL);
-      }
-    });
-
-    function drawWaveform(buffer) {
-      waveformCanvas.width = waveformCanvas.clientWidth;
-      waveformCanvas.height = waveformCanvas.clientHeight;
-      const data = buffer.getChannelData(0);
-      const step = Math.floor(data.length / waveformCanvas.width);
-      const amp = waveformCanvas.height / 2;
-      waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
-      waveformCtx.beginPath();
-      for (let i = 0; i < waveformCanvas.width; i++) {
-        const min = Math.min(...data.slice(i * step, (i + 1) * step));
-        const max = Math.max(...data.slice(i * step, (i + 1) * step));
-        waveformCtx.moveTo(i, amp + min * amp);
-        waveformCtx.lineTo(i, amp + max * amp);
-      }
-      waveformCtx.strokeStyle = '#0ff';
-      waveformCtx.stroke();
-    }
-
-    document.getElementById('chartFile').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            chart = JSON.parse(reader.result);
-            alert('✅ chart.json 読み込み完了');
-          } catch (err) {
-            alert('⚠️ 読み込み失敗: JSON形式が不正です');
-          }
-        };
-        reader.readAsText(file);
+        audio.src = URL.createObjectURL(file);
+        audio.load();
+        console.log("Audio loaded");
       }
     });
 
     function createLanes() {
-      for (let i = 0; i < laneCount; i++) {
+      const wrapper = document.getElementById('laneWrapper');
+      keyMap.forEach((key, i) => {
         const lane = document.createElement('div');
         lane.className = 'lane';
-        laneWrapper.appendChild(lane);
+        const label = document.createElement('div');
+        label.className = 'lane-key-label';
+        label.textContent = key;
+        lane.appendChild(label);
+        wrapper.appendChild(lane);
         lanes.push(lane);
-      }
-    }
-
-    function spawnNote(laneIndex, time, hold = false) {
-      const note = document.createElement('div');
-      note.className = hold ? 'note hold' : 'note';
-      note.dataset.spawnTime = time;
-      lanes[laneIndex].appendChild(note);
-
-      note.onmousedown = (e) => {
-        const startY = e.clientY;
-        const startTop = parseFloat(note.style.top || '0');
-        const moveHandler = (moveEvent) => {
-          const delta = moveEvent.clientY - startY;
-          const newTop = startTop + delta;
-          note.style.top = `${newTop}px`;
-          note.dataset.spawnTime = (newTop / 120).toFixed(3);
-        };
-        const upHandler = () => {
-          document.removeEventListener('mousemove', moveHandler);
-          document.removeEventListener('mouseup', upHandler);
-        };
-        document.addEventListener('mousemove', moveHandler);
-        document.addEventListener('mouseup', upHandler);
-      };
-
-      note.addEventListener('click', (e) => {
-        e.stopPropagation();
-        lanes[laneIndex].removeChild(note);
-        recordedNotes = recordedNotes.filter(n => !(n.lane === laneIndex && Math.abs(n.time - time) < 0.05));
-        console.log(`🗑 ノート削除: lane=${laneIndex}, time≈${time.toFixed(3)}`);
-        saveState();
-      });
-
-      return { el: note, lane: laneIndex, time };
-    }
-
-    function saveState() {
-      historyStack.push(JSON.stringify(recordedNotes));
-    }
-
-    function undo() {
-      if (historyStack.length > 0) {
-        recordedNotes = JSON.parse(historyStack.pop());
-        document.querySelectorAll('.note').forEach(n => n.remove());
-        recordedNotes.forEach(n => spawnNote(n.lane, n.time));
-      }
-    }
-
-    function playChart() {
-      console.log("[再生] 開始");
-      startTime = performance.now();
-      isPlaying = true;
-      chart.concat(recordedNotes).forEach(n => spawnNote(n.lane, n.time));
-      audio.currentTime = 0;
-      audio.play().then(() => {
-        console.log("✅ Audio再生成功");
-      }).catch(err => {
-        console.error("❌ Audio再生失敗", err);
-        alert("音声再生に失敗しました。ブラウザやファイル形式を確認してください。");
       });
     }
 
-    function saveChart() {
-      const blob = new Blob([JSON.stringify(recordedNotes, null, 2)], {type: 'application/json'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'chart.json';
-      a.click();
+    function drawBars() {
+      const wrapper = document.getElementById('laneWrapper');
+      for (let i = 0; i < 100; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'bar-line';
+        bar.style.bottom = `${i * 200}px`;
+        wrapper.appendChild(bar);
+      }
     }
 
-    function setupInput() {
-      document.addEventListener('keydown', (e) => {
-        if (!isPlaying) return;
-        const laneIndex = keyMap.indexOf(e.key);
-        if (laneIndex !== -1) {
-          const time = (performance.now() - startTime) / 1000;
-          recordedNotes.push({ lane: laneIndex, time });
-          console.log(`🎵 ノート記録: lane=${laneIndex}, time=${time.toFixed(3)}`);
-          spawnNote(laneIndex, time);
-          saveState();
+    function setupFlashEffect() {
+      keyMap.forEach((key, i) => {
+        window.addEventListener('keydown', (e) => {
+          if (e.key === key) {
+            lanes[i].style.backgroundColor = '#0ff3';
+            setTimeout(() => lanes[i].style.backgroundColor = '', 100);
+          }
+        });
+      });
+    }
+
+    function setupNoteRecording() {
+      window.addEventListener('keydown', (e) => {
+        const index = keyMap.indexOf(e.key);
+        if (index !== -1) {
+          const note = document.createElement('div');
+          note.className = 'note';
+          note.style.bottom = '0px';
+          lanes[index].appendChild(note);
+          recordedNotes.push({ lane: index, time: Date.now() });
         }
       });
     }
 
-    function animateNotes() {
-      const noteSpeed = 120;
-      function loop() {
-        if (isPlaying) {
-          const now = (performance.now() - startTime) / 1000;
-          document.querySelectorAll('.note').forEach(note => {
-            const t = parseFloat(note.dataset.spawnTime);
-            const y = (now - t) * noteSpeed;
-            note.style.top = `${y}px`;
-          });
-        }
-        requestAnimationFrame(loop);
-      }
-      loop();
-    }
-
-    document.getElementById('playBtn').onclick = playChart;
-    document.getElementById('saveBtn').onclick = saveChart;
-    document.getElementById('undoBtn').onclick = undo;
-    document.getElementById('aiFixBtn').onclick = () => {
-      console.log('[AI補正] 実行');
-      alert('🧠 AI補正（試験機能）: WAV波形と比較してノートのタイミングを最適化します。（開発中）');
-    };
-
-    document.getElementById('keyConfigBtn').onclick = () => {
-      const newKeys = prompt('キーをカンマ区切りで4つ入力 (例: a,s,k,l)', keyMap.join(','));
-      if (newKeys) {
-        const keys = newKeys.split(',').map(k => k.trim()).filter(k => k);
-        if (keys.length === laneCount) {
-          keyMap = keys;
-          localStorage.setItem('keyMap', JSON.stringify(keyMap));
-          updateKeyMapDisplay();
-          alert('キー設定を保存しました');
-        } else {
-          alert('4つのキーを指定してください');
-        }
-      }
-    };
+    document.getElementById('testPlayBtn').addEventListener('click', () => {
+      alert("🎮 テストプレイ（仮）\nノーツ判定・スコア確認機能は今後実装予定");
+    });
 
     createLanes();
-    setupInput();
-    animateNotes();
-    updateKeyMapDisplay();
+    drawBars();
+    setupFlashEffect();
+    setupNoteRecording();
   </script>
 </body>
 </html>
