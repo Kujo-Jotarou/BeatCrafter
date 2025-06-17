@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
   <style>
-    /* --- 省略なし・全部入りCSS --- */
     .editor-header {
       padding: 1rem;
       background: #001820;
@@ -114,7 +113,7 @@
     }
 
     function playChart() {
-      console.log("[再生] 開始");
+      console.log("[再生] 開始", audioURL);
       startTime = performance.now();
       isPlaying = true;
       chart.forEach(n => spawnNote(n.lane, n.time));
