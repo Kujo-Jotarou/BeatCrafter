@@ -89,16 +89,15 @@
   <script>
     const laneCount = 4;
     const lanes = [...Array(laneCount)].map((_, i) => document.getElementById(`lane${i}`));
-
     const noteSpeed = 100; // px/sec
+
     const chartJSON = sessionStorage.getItem('chartData');
     const chart = JSON.parse(chartJSON || '[]');
+    const audioURL = sessionStorage.getItem('audioURL');
+    const audio = new Audio(audioURL);
 
-    const audioData = sessionStorage.getItem('audioData');
-    const audio = new Audio(audioData);
     let startTime = 0;
     let isPlaying = false;
-
     const allNotes = [];
 
     function spawnNote(laneIndex, time) {
