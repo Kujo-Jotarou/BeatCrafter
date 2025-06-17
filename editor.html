@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
-
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -35,14 +34,16 @@
       align-items: center;
       height: 70vh;
       gap: 1rem;
+      position: relative;
+      overflow: hidden;
     }
 
     .lane {
       width: 60px;
       height: 100%;
-      background: linear-gradient(to bottom, #111, #0ff2);
-      border: 1px solid #0ff4;
-      box-shadow: 0 0 10px #0ff5;
+      background: linear-gradient(to bottom, #111, #0ff1);
+      border: 1px solid #0ff3;
+      box-shadow: 0 0 10px #0ff4;
       position: relative;
     }
 
@@ -54,15 +55,6 @@
       position: absolute;
     }
 
-    .footer {
-      position: absolute;
-      bottom: 1rem;
-      width: 100%;
-      text-align: center;
-      font-size: 0.8rem;
-      color: #0ff6;
-    }
-
     button {
       background: transparent;
       color: #0ff;
@@ -71,7 +63,6 @@
       font-family: inherit;
       font-size: 1rem;
       cursor: pointer;
-      transition: 0.2s;
     }
 
     button:hover {
@@ -82,7 +73,7 @@
 </head>
 <body>
 
-  <div class="header">CYBER BLITZ EDITOR - Press A/S/K/L to record notes</div>
+  <div class="header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認</div>
 
   <div class="controls">
     <button id="playBtn">▶ PLAY</button>
@@ -95,57 +86,52 @@
     <div class="lane" id="lane3"></div>
   </div>
 
-  <div class="footer">Keys: A / S / K / L</div>
-
   <script>
-    const keyMap = {
-      'a': 0,
-      's': 1,
-      'k': 2,
-      'l': 3
-    };
+    const laneCount = 4;
+    const lanes = [...Array(laneCount)].map((_, i) => document.getElementById(`lane${i}`));
 
-    const lanes = [
-      document.getElementById("lane0"),
-      document.getElementById("lane1"),
-      document.getElementById("lane2"),
-      document.getElementById("lane3")
-    ];
+    const noteSpeed = 100; // px/sec
+    const chartJSON = sessionStorage.getItem('chartData');
+    const chart = JSON.parse(chartJSON || '[]');
 
-    const notes = [];
-
-    let audio, audioStart = 0;
-
-    // ロード済み音声（Base64）を使ってAudio再生
     const audioData = sessionStorage.getItem('audioData');
-    if (audioData) {
-      audio = new Audio(audioData);
+    const audio = new Audio(audioData);
+    let startTime = 0;
+    let isPlaying = false;
+
+    const allNotes = [];
+
+    function spawnNote(laneIndex, time) {
+      const note = document.createElement('div');
+      note.className = 'note';
+      note.dataset.spawnTime = time;
+      note.style.top = '-10px';
+      lanes[laneIndex].appendChild(note);
+      allNotes.push({ el: note, lane: laneIndex, time });
     }
 
-    document.getElementById("playBtn").onclick = () => {
-      if (!audio) return;
+    document.getElementById('playBtn').onclick = () => {
       audio.currentTime = 0;
-      audioStart = performance.now();
       audio.play();
+      startTime = performance.now();
+      isPlaying = true;
+
+      chart.forEach(n => spawnNote(n.lane, n.time));
     };
 
-    // ノーツ記録＋UI表示
-    window.addEventListener("keydown", (e) => {
-      const key = e.key.toLowerCase();
-      if (!(key in keyMap)) return;
+    function animate() {
+      if (isPlaying) {
+        const now = (performance.now() - startTime) / 1000;
+        allNotes.forEach(({ el, time }) => {
+          const elapsed = now - time;
+          const y = elapsed * noteSpeed;
+          if (y >= -10) el.style.top = `${y}px`;
+        });
+      }
+      requestAnimationFrame(animate);
+    }
 
-      const laneIndex = keyMap[key];
-      const lane = lanes[laneIndex];
-
-      const time = (performance.now() - audioStart) / 1000;
-      notes.push({ lane: laneIndex, time: parseFloat(time.toFixed(3)) });
-
-      const noteEl = document.createElement("div");
-      noteEl.className = "note";
-      noteEl.style.top = `${lane.scrollTop}px`;
-      lane.appendChild(noteEl);
-    });
+    animate();
   </script>
-
 </body>
 </html>
