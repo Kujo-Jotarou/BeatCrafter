@@ -6,11 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
   <style>
+    body {
+      background: black;
+      color: #0ff;
+      font-family: 'Orbitron', sans-serif;
+      text-align: center;
+    }
     .editor-header {
       padding: 1rem;
       background: #001820;
+      text-shadow: 0 0 5px #0ff;
+    }
+    .controls {
+      margin: 1rem 0;
+    }
+    .controls input, .controls button {
+      margin: 0.25rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border: 1px solid #0ff;
+      background: transparent;
       color: #0ff;
       text-shadow: 0 0 5px #0ff;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background: #0ff;
+      color: black;
     }
     .lane-wrapper {
       display: flex;
@@ -24,7 +46,7 @@
     .lane {
       width: 60px;
       height: 100%;
-      background: linear-gradient(to bottom, #000000 0%, #002020 100%);
+      background: linear-gradient(to bottom, #000, #002020);
       border: 1px solid #044;
       box-shadow: inset 0 0 10px #0ff5;
       position: relative;
@@ -38,117 +60,56 @@
       position: absolute;
       top: -12px;
     }
-    .controls {
-      text-align: center;
-      margin-top: 1rem;
-    }
-    .controls button, .controls input[type="file"] {
-      background: transparent;
-      color: #0ff;
-      border: 1px solid #0ff;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      margin: 0.25rem;
-      cursor: pointer;
-      text-shadow: 0 0 5px #0ff;
-    }
-    .controls button:hover {
-      background: #0ff;
-      color: black;
-    }
   </style>
 </head>
 <body>
-  <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録</div>
+  <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを記録</div>
   <div class="controls">
-    <input type="file" id="audioFile" accept="audio/*">
+    <input type="file" id="audioInput" accept="audio/*">
+    <input type="file" id="chartInput" accept=".json">
     <button id="playBtn">▶ 再生</button>
     <button id="saveBtn">💾 保存</button>
-    <button id="aiFixBtn">🤖 AI補正</button>
+    <button id="aiBtn">🤖 AI補正</button>
   </div>
   <div class="lane-wrapper" id="laneWrapper"></div>
 
   <script>
     const laneCount = 4;
-    const laneWrapper = document.getElementById('laneWrapper');
     const keyMap = ['d', 'f', 'j', 'k'];
     const lanes = [];
-    const audio = new Audio();
+    let chart = [];
+    let recordedNotes = [];
+    let audio = new Audio();
     let startTime = 0;
     let isPlaying = false;
-    let recordedNotes = [];
-    let chart = [];
 
-    document.getElementById('audioFile').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) {
-        const blobURL = URL.createObjectURL(file);
-        audio.src = blobURL;
-        console.log("🎧 音声ファイル読み込み成功", blobURL);
-      }
-    });
+    const wrapper = document.getElementById('laneWrapper');
 
     function createLanes() {
       for (let i = 0; i < laneCount; i++) {
         const lane = document.createElement('div');
         lane.className = 'lane';
-        laneWrapper.appendChild(lane);
+        wrapper.appendChild(lane);
         lanes.push(lane);
       }
     }
 
-    function spawnNote(laneIndex, time) {
+    function spawnNote(lane, time) {
       const note = document.createElement('div');
       note.className = 'note';
       note.dataset.spawnTime = time;
-      lanes[laneIndex].appendChild(note);
-      return { el: note, lane: laneIndex, time };
-    }
-
-    function playChart() {
-      console.log("[再生] 開始");
-      startTime = performance.now();
-      isPlaying = true;
-      chart.forEach(n => spawnNote(n.lane, n.time));
-      audio.currentTime = 0;
-      audio.play().then(() => {
-        console.log("✅ Audio再生成功");
-      }).catch(err => {
-        console.error("❌ Audio再生失敗", err);
-        alert("音声再生に失敗しました。ブラウザやファイル形式を確認してください。");
-      });
-    }
-
-    function saveChart() {
-      const blob = new Blob([JSON.stringify(recordedNotes, null, 2)], {type: 'application/json'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'chart.json';
-      a.click();
-    }
-
-    function setupInput() {
-      document.addEventListener('keydown', (e) => {
-        if (!isPlaying) return;
-        const laneIndex = keyMap.indexOf(e.key);
-        if (laneIndex !== -1) {
-          const time = (performance.now() - startTime) / 1000;
-          recordedNotes.push({ lane: laneIndex, time });
-          console.log(`ノート記録: lane=${laneIndex}, time=${time.toFixed(3)}`);
-          spawnNote(laneIndex, time);
-        }
-      });
+      lanes[lane].appendChild(note);
     }
 
     function animateNotes() {
-      const noteSpeed = 120;
+      const speed = 120;
       function loop() {
         if (isPlaying) {
           const now = (performance.now() - startTime) / 1000;
-          document.querySelectorAll('.note').forEach(note => {
-            const t = parseFloat(note.dataset.spawnTime);
-            const y = (now - t) * noteSpeed;
-            note.style.top = `${y}px`;
+          document.querySelectorAll('.note').forEach(n => {
+            const t = parseFloat(n.dataset.spawnTime);
+            const y = (now - t) * speed;
+            n.style.top = `${y}px`;
           });
         }
         requestAnimationFrame(loop);
@@ -156,15 +117,70 @@
       loop();
     }
 
-    document.getElementById('playBtn').onclick = playChart;
-    document.getElementById('saveBtn').onclick = saveChart;
-    document.getElementById('aiFixBtn').onclick = () => {
-      console.log('[AI補正] 実行 → WAV波形に基づいて時間を微修正（仮）');
-      alert('AI補正（開発中）: 波形と照合してノーツタイミングを調整します');
+    function handleKeyDown(e) {
+      if (!isPlaying) return;
+      const lane = keyMap.indexOf(e.key);
+      if (lane !== -1) {
+        const t = (performance.now() - startTime) / 1000;
+        recordedNotes.push({ lane, time: t });
+        console.log(`記録: lane ${lane}, time ${t.toFixed(3)}`);
+        spawnNote(lane, t);
+      }
+    }
+
+    document.getElementById('audioInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        audio = new Audio(url);
+        console.log("🎧 Audio 読み込み完了", file.name);
+      }
+    });
+
+    document.getElementById('chartInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            chart = JSON.parse(reader.result);
+            console.log("📊 チャート読み込み成功", chart);
+          } catch (e) {
+            alert("JSON読み込みエラー");
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    document.getElementById('playBtn').onclick = () => {
+      if (!audio.src) return alert("音楽ファイルを読み込んでください");
+      wrapper.querySelectorAll('.note').forEach(n => n.remove());
+      recordedNotes = [];
+      chart.forEach(n => spawnNote(n.lane, n.time));
+      startTime = performance.now();
+      isPlaying = true;
+      audio.currentTime = 0;
+      audio.play().then(() => console.log("▶ 再生開始")).catch(err => {
+        alert("再生できませんでした");
+        console.error(err);
+      });
     };
 
+    document.getElementById('saveBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify(recordedNotes, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = "chart.json";
+      a.click();
+    };
+
+    document.getElementById('aiBtn').onclick = () => {
+      alert("AI補正は開発中です（タイミング微調整予定）");
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
     createLanes();
-    setupInput();
     animateNotes();
   </script>
 </body>
