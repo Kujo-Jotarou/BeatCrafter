@@ -37,28 +37,20 @@
       box-shadow: 0 0 8px #f0f, 0 0 16px #f0f;
       position: absolute;
       top: -12px;
-      cursor: pointer;
+      cursor: grab;
+    }
+    .note:active {
+      cursor: grabbing;
+    }
+    .hold {
+      background: linear-gradient(to bottom, #ff0, #f0f);
+      height: 60px;
     }
     .controls {
       text-align: center;
       margin-top: 1rem;
     }
-    .controls label.btn {
-      display: inline-block;
-      cursor: pointer;
-      border: 1px solid #0ff;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      margin: 0.25rem;
-      text-shadow: 0 0 5px #0ff;
-      color: #0ff;
-      background: transparent;
-    }
-    .controls label.btn:hover {
-      background: #0ff;
-      color: black;
-    }
-    .controls button {
+    .controls button, .controls input[type="file"] {
       background: transparent;
       color: #0ff;
       border: 1px solid #0ff;
@@ -77,19 +69,27 @@
       color: #ccc;
       font-size: 0.9rem;
     }
+    canvas#waveform {
+      width: 100%;
+      height: 100px;
+      background: #000;
+      display: block;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
   <div class="editor-header">CYBER BLITZ EDITOR - 音楽を再生してノーツを確認・記録・編集</div>
   <div class="controls">
-    <label class="btn">🎧 音声選択<input type="file" id="audioFile" accept="audio/*" style="display:none;"></label>
-    <label class="btn">📄 チャート選択<input type="file" id="chartFile" accept=".json" style="display:none;"></label>
+    <input type="file" id="audioFile" accept="audio/*">
+    <input type="file" id="chartFile" accept=".json">
     <button id="playBtn">▶ 再生</button>
     <button id="saveBtn">💾 保存</button>
     <button id="undoBtn">↩️ Undo</button>
     <button id="aiFixBtn">🤖 AI補正</button>
     <button id="keyConfigBtn">🎛 キー設定</button>
   </div>
+  <canvas id="waveform"></canvas>
   <div class="lane-wrapper" id="laneWrapper"></div>
   <div class="keymap" id="keyMapDisplay"></div>
 
@@ -97,9 +97,12 @@
     const laneCount = 4;
     const laneWrapper = document.getElementById('laneWrapper');
     const keyMapDisplay = document.getElementById('keyMapDisplay');
+    const waveformCanvas = document.getElementById('waveform');
+    const waveformCtx = waveformCanvas.getContext('2d');
     let keyMap = JSON.parse(localStorage.getItem('keyMap')) || ['d', 'f', 'j', 'k'];
     const lanes = [];
     let audio = new Audio();
+    let audioBuffer;
     let startTime = 0;
     let isPlaying = false;
     let recordedNotes = [];
@@ -110,14 +113,38 @@
       keyMapDisplay.textContent = `キー設定: ${keyMap.join(' / ')}`;
     }
 
-    document.getElementById('audioFile').addEventListener('change', e => {
+    document.getElementById('audioFile').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (file) {
         const blobURL = URL.createObjectURL(file);
         audio.src = blobURL;
+        const arrayBuffer = await file.arrayBuffer();
+        const context = new AudioContext();
+        context.decodeAudioData(arrayBuffer, (buffer) => {
+          audioBuffer = buffer;
+          drawWaveform(buffer);
+        });
         console.log("🎧 音声ファイル読み込み成功", blobURL);
       }
     });
+
+    function drawWaveform(buffer) {
+      waveformCanvas.width = waveformCanvas.clientWidth;
+      waveformCanvas.height = waveformCanvas.clientHeight;
+      const data = buffer.getChannelData(0);
+      const step = Math.floor(data.length / waveformCanvas.width);
+      const amp = waveformCanvas.height / 2;
+      waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+      waveformCtx.beginPath();
+      for (let i = 0; i < waveformCanvas.width; i++) {
+        const min = Math.min(...data.slice(i * step, (i + 1) * step));
+        const max = Math.max(...data.slice(i * step, (i + 1) * step));
+        waveformCtx.moveTo(i, amp + min * amp);
+        waveformCtx.lineTo(i, amp + max * amp);
+      }
+      waveformCtx.strokeStyle = '#0ff';
+      waveformCtx.stroke();
+    }
 
     document.getElementById('chartFile').addEventListener('change', e => {
       const file = e.target.files[0];
@@ -139,31 +166,42 @@
       for (let i = 0; i < laneCount; i++) {
         const lane = document.createElement('div');
         lane.className = 'lane';
-        lane.addEventListener('click', (e) => {
-          if (!isPlaying) {
-            const y = e.offsetY;
-            const time = y / 120;
-            recordedNotes.push({ lane: i, time });
-            spawnNote(i, time);
-            saveState();
-          }
-        });
         laneWrapper.appendChild(lane);
         lanes.push(lane);
       }
     }
 
-    function spawnNote(laneIndex, time) {
+    function spawnNote(laneIndex, time, hold = false) {
       const note = document.createElement('div');
-      note.className = 'note';
+      note.className = hold ? 'note hold' : 'note';
       note.dataset.spawnTime = time;
       lanes[laneIndex].appendChild(note);
-      note.addEventListener('click', () => {
+
+      note.onmousedown = (e) => {
+        const startY = e.clientY;
+        const startTop = parseFloat(note.style.top || '0');
+        const moveHandler = (moveEvent) => {
+          const delta = moveEvent.clientY - startY;
+          const newTop = startTop + delta;
+          note.style.top = `${newTop}px`;
+          note.dataset.spawnTime = (newTop / 120).toFixed(3);
+        };
+        const upHandler = () => {
+          document.removeEventListener('mousemove', moveHandler);
+          document.removeEventListener('mouseup', upHandler);
+        };
+        document.addEventListener('mousemove', moveHandler);
+        document.addEventListener('mouseup', upHandler);
+      };
+
+      note.addEventListener('click', (e) => {
+        e.stopPropagation();
         lanes[laneIndex].removeChild(note);
         recordedNotes = recordedNotes.filter(n => !(n.lane === laneIndex && Math.abs(n.time - time) < 0.05));
         console.log(`🗑 ノート削除: lane=${laneIndex}, time≈${time.toFixed(3)}`);
         saveState();
       });
+
       return { el: note, lane: laneIndex, time };
     }
 
