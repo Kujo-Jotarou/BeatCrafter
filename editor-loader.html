@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Editor Loader - CYBER BLITZ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Orbitron', monospace;
+      color: #0ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+
+    .dropzone {
+      border: 2px dashed #0ff;
+      padding: 3rem;
+      width: 80%;
+      max-width: 500px;
+      text-align: center;
+      cursor: pointer;
+      text-shadow: 0 0 5px #0ff;
+      transition: all 0.2s ease;
+    }
+
+    .dropzone.dragover {
+      background-color: rgba(0, 255, 255, 0.1);
+      box-shadow: 0 0 10px #0ff;
+    }
+
+    .file-label {
+      margin-top: 1rem;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dropzone" id="dropzone">
+    <p><strong>Drag & Drop</strong> your <span style="color:#f0f">music</span> and <span style="color:#f0f">chart.json</span> file here</p>
+    <p>or click to select files manually</p>
+  </div>
+
+  <input type="file" id="fileInput" multiple accept=".mp3,.wav,.json"/>
+
+  <div class="file-label" id="statusLabel">Waiting for files...</div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const statusLabel = document.getElementById('statusLabel');
+
+    let audioFile = null;
+    let chartFile = null;
+
+    function handleFiles(files) {
+      for (let file of files) {
+        if (file.type.startsWith("audio/")) {
+          audioFile = file;
+        } else if (file.name.endsWith(".json")) {
+          chartFile = file;
+        }
+      }
+
+      updateStatus();
+
+      if (audioFile && chartFile) {
+        proceedToEditor();
+      }
+    }
+
+    function updateStatus() {
+      statusLabel.textContent = `Audio: ${audioFile?.name || '❌'} | Chart: ${chartFile?.name || '❌'}`;
+    }
+
+    function proceedToEditor() {
+      const readerAudio = new FileReader();
+      const readerChart = new FileReader();
+
+      readerAudio.onload = () => {
+        const audioData = readerAudio.result;
+        readerChart.onload = () => {
+          const chartData = readerChart.result;
+
+          sessionStorage.setItem('audioData', audioData);
+          sessionStorage.setItem('chartData', chartData);
+          window.location.href = 'editor.html';
+        };
+        readerChart.readAsText(chartFile);
+      };
+
+      readerAudio.readAsDataURL(audioFile);
+    }
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    dropzone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', () => {
+      handleFiles(fileInput.files);
+    });
+  </script>
+
+</body>
+</html>
